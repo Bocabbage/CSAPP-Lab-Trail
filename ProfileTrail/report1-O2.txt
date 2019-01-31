@@ -1,0 +1,50 @@
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  ms/call  ms/call  name    
+ 36.84      0.14     0.14  2499950     0.00     0.00  merge1(int*, int, int, int)
+ 36.84      0.28     0.14                             _fu0___ZSt4cout
+ 10.53      0.32     0.04                             main
+  7.89      0.35     0.03                             _mcount_private
+  2.63      0.36     0.01       50     0.20     3.00  MergeSort(int*, int, int)
+  2.63      0.37     0.01                             std::ostream::flush()
+  2.63      0.38     0.01                             __chkstk_ms
+
+			Call graph
+
+
+granularity: each sample hit covers 4 byte(s) for 2.63% of 0.38 seconds
+
+index % time    self  children    called     name
+                                                 <spontaneous>
+[1]     50.0    0.04    0.15                 main [1]
+                0.01    0.14      50/50          MergeSort(int*, int, int) [2]
+-----------------------------------------------
+                             7499800             MergeSort(int*, int, int) [2]
+                0.01    0.14      50/50          main [1]
+[2]     39.5    0.01    0.14      50+7499800 MergeSort(int*, int, int) [2]
+                0.14    0.00 2499950/2499950     merge1(int*, int, int, int) [3]
+                             7499800             MergeSort(int*, int, int) [2]
+-----------------------------------------------
+                0.14    0.00 2499950/2499950     MergeSort(int*, int, int) [2]
+[3]     36.8    0.14    0.00 2499950         merge1(int*, int, int, int) [3]
+-----------------------------------------------
+                                                 <spontaneous>
+[4]     36.8    0.14    0.00                 _fu0___ZSt4cout [4]
+-----------------------------------------------
+                                                 <spontaneous>
+[5]      7.9    0.03    0.00                 _mcount_private [5]
+-----------------------------------------------
+                                                 <spontaneous>
+[6]      2.6    0.01    0.00                 std::ostream::flush() [6]
+-----------------------------------------------
+                                                 <spontaneous>
+[7]      2.6    0.01    0.00                 __chkstk_ms [7]
+-----------------------------------------------
+
+Index by function name
+
+   [3] merge1(int*, int, int, int) [7] __chkstk_ms         [1] main
+   [2] MergeSort(int*, int, int) [4] _fu0___ZSt4cout
+   [6] std::ostream::flush()   [5] _mcount_private

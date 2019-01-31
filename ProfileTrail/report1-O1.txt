@@ -1,0 +1,41 @@
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  ms/call  ms/call  name    
+ 47.50      0.19     0.19                             main
+ 37.50      0.34     0.15  2499950     0.00     0.00  merge1(int*, int, int, int)
+ 10.00      0.38     0.04                             _mcount_private
+  2.50      0.39     0.01       50     0.20     3.20  MergeSort(int*, int, int)
+  2.50      0.40     0.01                             __chkstk_ms
+
+			Call graph
+
+
+granularity: each sample hit covers 4 byte(s) for 2.50% of 0.40 seconds
+
+index % time    self  children    called     name
+                                                 <spontaneous>
+[1]     87.5    0.19    0.16                 main [1]
+                0.01    0.15      50/50          MergeSort(int*, int, int) [2]
+-----------------------------------------------
+                             4999900             MergeSort(int*, int, int) [2]
+                0.01    0.15      50/50          main [1]
+[2]     40.0    0.01    0.15      50+4999900 MergeSort(int*, int, int) [2]
+                0.15    0.00 2499950/2499950     merge1(int*, int, int, int) [3]
+                             4999900             MergeSort(int*, int, int) [2]
+-----------------------------------------------
+                0.15    0.00 2499950/2499950     MergeSort(int*, int, int) [2]
+[3]     37.5    0.15    0.00 2499950         merge1(int*, int, int, int) [3]
+-----------------------------------------------
+                                                 <spontaneous>
+[4]     10.0    0.04    0.00                 _mcount_private [4]
+-----------------------------------------------
+                                                 <spontaneous>
+[5]      2.5    0.01    0.00                 __chkstk_ms [5]
+-----------------------------------------------
+
+Index by function name
+
+   [3] merge1(int*, int, int, int) [5] __chkstk_ms         [1] main
+   [2] MergeSort(int*, int, int) [4] _mcount_private

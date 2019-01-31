@@ -1,0 +1,45 @@
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  ms/call  ms/call  name    
+ 48.84      0.21     0.21  2499950     0.00     0.00  merge2(int*, int, int, int)
+ 25.58      0.32     0.11                             _fu0___ZSt4cout
+ 16.28      0.39     0.07                             _mcount_private
+  6.98      0.42     0.03                             main
+  2.33      0.43     0.01                             __chkstk_ms
+  0.00      0.43     0.00       50     0.00     4.20  MergeSort(int*, int, int)
+
+			Call graph
+
+
+granularity: each sample hit covers 4 byte(s) for 2.33% of 0.43 seconds
+
+index % time    self  children    called     name
+                                                 <spontaneous>
+[1]     55.8    0.03    0.21                 main [1]
+                0.00    0.21      50/50          MergeSort(int*, int, int) [3]
+-----------------------------------------------
+                0.21    0.00 2499950/2499950     MergeSort(int*, int, int) [3]
+[2]     48.8    0.21    0.00 2499950         merge2(int*, int, int, int) [2]
+-----------------------------------------------
+                             7499800             MergeSort(int*, int, int) [3]
+                0.00    0.21      50/50          main [1]
+[3]     48.8    0.00    0.21      50+7499800 MergeSort(int*, int, int) [3]
+                0.21    0.00 2499950/2499950     merge2(int*, int, int, int) [2]
+                             7499800             MergeSort(int*, int, int) [3]
+-----------------------------------------------
+                                                 <spontaneous>
+[4]     25.6    0.11    0.00                 _fu0___ZSt4cout [4]
+-----------------------------------------------
+                                                 <spontaneous>
+[5]     16.3    0.07    0.00                 _mcount_private [5]
+-----------------------------------------------
+                                                 <spontaneous>
+[6]      2.3    0.01    0.00                 __chkstk_ms [6]
+-----------------------------------------------
+
+Index by function name
+
+   [2] merge2(int*, int, int, int) [6] __chkstk_ms         [5] _mcount_private
+   [3] MergeSort(int*, int, int) [4] _fu0___ZSt4cout       [1] main
