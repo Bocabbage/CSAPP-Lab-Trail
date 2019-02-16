@@ -4,6 +4,7 @@
  * 更新时间：2019/2/14(进度：trace03)
  *          2019/2/15(进度：处理完信号堵塞[同步]->trace04，后台执行存在segment error未解决)
  *          2019/2/16(进度：trace08-->signal处理程序完成)
+ *          2019/2/16(进度：finish....ed?仍留有段错误(却通过了runtrace??))
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -319,6 +320,11 @@ int builtin_cmd(char **argv)
         Sigprocmask(SIG_SETMASK,&prev,NULL);
         return 1;
     }
+    else if(!strcmp("bg",argv[0]) || !strcmp("fg",argv[0]))
+    {
+        do_bgfg(argv);
+        return 1;
+    }
     return 0;     /* not a builtin command */
 }
 
@@ -327,6 +333,81 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+
+    pid_t pid;
+    int jid;
+    struct job_t* job;
+    char *id=argv[1];
+    //sigset_t mask,prev;
+    //Sigfillset(&mask);
+    if(id == NULL)
+    {
+        //must be placed at first
+        printf("%s: command requires PID or %%jobid argument\n",argv[0]);
+        return;
+    }
+    else if(isdigit(id[0]))
+    {
+        pid = atoi(&argv[1][0]);
+        if(!(job = getjobpid(jobs,pid)))
+        {
+            printf("%d: No such job\n",pid);
+            return;
+        }
+        if(strcmp(argv[0],"bg"))
+        {
+            //Sigprocmask(SIG_BLOCK,&mask,&prev);
+            job->state = BG;
+            //Sigprocmask(SIG_SETMASK,&prev,NULL);
+            Kill(-pid,SIGCONT);
+            
+        }
+        else
+        {
+            //Sigprocmask(SIG_BLOCK,&mask,&prev);
+            job->state = FG;
+            //Sigprocmask(SIG_SETMASK,&prev,NULL);
+            Kill(-pid,SIGCONT);
+            waitfg(pid);
+            
+        }
+    }    
+    else if(id[0]=='%')
+    {
+        jid = atoi(&argv[1][1]);
+        if(!(job = getjobjid(jobs,jid)))
+        {
+            printf("%%%d: No such job\n",jid);
+            return;
+        }
+
+        if(!strcmp(argv[0],"bg"))
+        {
+            //Sigprocmask(SIG_BLOCK,&mask,&prev);
+            pid = job->pid;
+            job->state = BG;
+            //Sigprocmask(SIG_SETMASK,&prev,NULL);
+            Kill(-pid,SIGCONT);
+            
+        }
+        else
+        {
+            //Sigprocmask(SIG_BLOCK,&mask,&prev);
+            pid = job->pid;
+            job->state = FG;
+            //Sigprocmask(SIG_SETMASK,&prev,NULL);
+            Kill(-pid,SIGCONT);
+            waitfg(pid);
+            
+        }
+
+    }
+    else
+    {
+        printf("%s: argument must be a PID or %%jobid\n",argv[0]);
+        return;
+    }    
+
     return;
 }
 
