@@ -2,7 +2,8 @@
  * tsh - A tiny shell program with job control
  * 
  * 更新时间：2019/2/14(进度：trace03)
- *          2019/2/15(进度：处理完信号堵塞[同步]，后台执行存在segment error未解决)
+ *          2019/2/15(进度：处理完信号堵塞[同步]->trace04，后台执行存在segment error未解决)
+ *          2019/2/16(进度：trace08-->signal处理程序完成)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,7 +63,7 @@ void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 void Sigemptyset(sigset_t *set);
 void Sigaddset(sigset_t *set, int signum);
 int Sigsuspend(const sigset_t *set);
-
+int Kill(pid_t pid, int signum);
 /* Here are the functions that you will implement */
 void eval(char *cmdline);
 int builtin_cmd(char **argv);
@@ -220,7 +221,7 @@ void eval(char *cmdline)
         else
         {
             addjob(jobs,PID,BG,cmdline);
-            printf("[%d](%d)%s is running\n",pid2jid(PID),PID,buf);
+            printf("[%d](%d)%s",pid2jid(PID),PID,buf);
             Sigprocmask(SIG_SETMASK,&prev_all,NULL);
         }
 
@@ -291,10 +292,33 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
+    sigset_t mask,prev;
+    Sigfillset(&mask);
+
     if(!strcmp(argv[0],"quit"))
         // "quit" for stop the process of tsh.
         // (x) (argv[0] == "quit") -- compare the address
         exit(0);
+    else if(!strcmp(argv[0],"jobs"))
+    {
+        Sigprocmask(SIG_BLOCK,&mask,&prev);
+        for (size_t i = 0; i < MAXJOBS; i++) 
+            if (jobs[i].pid != 0) 
+            {   
+                if(jobs[i].state == BG)
+                {
+                    printf("[%d] (%d) Running ", jobs[i].jid, jobs[i].pid);
+                    printf("%s", jobs[i].cmdline);
+                }
+                else if(jobs[i].state == ST)
+                {
+                    printf("[%d] (%d) Stopped ", jobs[i].jid, jobs[i].pid);
+                    printf("%s", jobs[i].cmdline);
+                }
+            }
+        Sigprocmask(SIG_SETMASK,&prev,NULL);
+        return 1;
+    }
     return 0;     /* not a builtin command */
 }
 
@@ -337,11 +361,30 @@ void sigchld_handler(int sig)
 
     while((pid = waitpid(-1,&status,WNOHANG|WUNTRACED))>0)
     {    
-        /*Reap a zombie child*/
+        /* Reap a zombie child */
         if(WIFEXITED(status))
         {   
             Sigprocmask(SIG_BLOCK,&mask_all,&prev_all);
             deletejob(jobs,pid);
+            Sigprocmask(SIG_SETMASK,&prev_all,NULL);
+        }
+        /* child process was terminated by ctrl+c */
+        else if(WIFSIGNALED(status))
+        {
+            Sigprocmask(SIG_BLOCK,&mask_all,&prev_all);
+            printf("Job [%d](%d) terminated by signal ",pid2jid(pid),pid);
+            printf(" %d\n",/*WTERMSIG(status)*/2);
+            deletejob(jobs,pid);
+            Sigprocmask(SIG_SETMASK,&prev_all,NULL);
+        }
+        else if(WIFSTOPPED(status))
+        {
+            struct job_t* job;
+            Sigprocmask(SIG_BLOCK,&mask_all,&prev_all);
+            job = (getjobpid(jobs,pid));
+            job->state = ST;
+            printf("Job [%d](%d) stooped by signal",job->jid,pid);
+            printf(" %d\n",/*WTERMSIG(status)*/20);
             Sigprocmask(SIG_SETMASK,&prev_all,NULL);
         }
 
@@ -357,6 +400,16 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+    int olderrno = errno;
+    pid_t pid = fgpid(jobs);    // Get the foreground job ID
+    if(pid!= 0)
+        // As the Lab Assignment said, here should be
+        // the '-pid' but not 'pid'
+        Kill(-pid,SIGINT);
+    // send the SIGINT signal and left
+    // works of printing info to
+    // sigchld_handler(int sig)
+    errno = olderrno;
     return;
 }
 
@@ -367,6 +420,11 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+    int olderrno = errno;
+    pid_t pid = fgpid(jobs);
+    if(pid!= 0)
+        Kill(-pid,SIGSTOP);
+    errno = olderrno;
     return;
 }
 
@@ -638,5 +696,15 @@ int Sigsuspend(const sigset_t *set)
     int rc = sigsuspend(set); /* always returns -1 */
     if (errno != EINTR)
         unix_error("Sigsuspend error");
+    return rc;
+}
+
+int Kill(pid_t pid, int signum) 
+{
+    int rc;
+
+    if ((rc = kill(pid, signum)) < 0)
+        unix_error("Kill error");
+
     return rc;
 }
