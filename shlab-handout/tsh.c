@@ -303,20 +303,7 @@ int builtin_cmd(char **argv)
     else if(!strcmp(argv[0],"jobs"))
     {
         Sigprocmask(SIG_BLOCK,&mask,&prev);
-        for (size_t i = 0; i < MAXJOBS; i++) 
-            if (jobs[i].pid != 0) 
-            {   
-                if(jobs[i].state == BG)
-                {
-                    printf("[%d] (%d) Running ", jobs[i].jid, jobs[i].pid);
-                    printf("%s", jobs[i].cmdline);
-                }
-                else if(jobs[i].state == ST)
-                {
-                    printf("[%d] (%d) Stopped ", jobs[i].jid, jobs[i].pid);
-                    printf("%s", jobs[i].cmdline);
-                }
-            }
+        listjobs(jobs)；
         Sigprocmask(SIG_SETMASK,&prev,NULL);
         return 1;
     }
