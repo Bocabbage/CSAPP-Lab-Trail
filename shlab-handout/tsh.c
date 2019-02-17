@@ -5,6 +5,7 @@
  *          2019/2/15(进度：处理完信号堵塞[同步]->trace04，后台执行存在segment error未解决)
  *          2019/2/16(进度：trace08-->signal处理程序完成)
  *          2019/2/16(进度：finish....ed?仍留有段错误(却通过了runtrace??))
+ *          2019/2/17(完善注释)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,7 +64,6 @@ void Sigfillset(sigset_t *set);
 void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 void Sigemptyset(sigset_t *set);
 void Sigaddset(sigset_t *set, int signum);
-int Sigsuspend(const sigset_t *set);
 int Kill(pid_t pid, int signum);
 /* Here are the functions that you will implement */
 void eval(char *cmdline);
@@ -199,6 +199,12 @@ void eval(char *cmdline)
         {
             
             Sigprocmask(SIG_SETMASK,&prev_all,NULL);
+            // setpgid(0,0) puts the child in a new process group
+            // whose group ID is identical to the child's ID.
+            // This ensures that there will be only one process, tsh,
+            // in the foreground process. --From Assignment of this lab
+            // My understanding is that there is a layer of abstract
+            // I call it "shell of shell".
             setpgid(0,0);
             if(execve(argv[0],argv,environ)<0)
             {    
@@ -215,8 +221,13 @@ void eval(char *cmdline)
             /*
             PID = 0;
             while(!PID)
-                Sigsuspend(&prev_all);
+                sigsuspend(&prev_all);
             */
+
+            // After the child process(fg) finished,
+            // a SIGCHLD emitted and the handler func
+            // will be done so the PID != fgpid(jobs),
+            // thus getting out of the loop
             waitfg(PID);
         }
         else
@@ -404,6 +415,10 @@ void do_bgfg(char **argv)
 void waitfg(pid_t pid)
 {
     while(pid == fgpid(jobs))
+        // A value of zero causes the thread to relinquish the remainder of its time slice
+        // to any other thread that is ready to run.
+        // If there are no other threads ready to run,
+        // the function returns immediately, and the thread continues execution.
         sleep(0);
     return;
 }
@@ -428,15 +443,17 @@ void sigchld_handler(int sig)
     Sigfillset(&mask_all);
 
     while((pid = waitpid(-1,&status,WNOHANG|WUNTRACED))>0)
+    // WNOHANG | WUNTRACED
+    // Receive all kinds of interrupt\stop signals
     {    
-        /* Reap a zombie child */
+        /* Reap a zombie child(SIGCHID) */
         if(WIFEXITED(status))
         {   
             Sigprocmask(SIG_BLOCK,&mask_all,&prev_all);
             deletejob(jobs,pid);
             Sigprocmask(SIG_SETMASK,&prev_all,NULL);
         }
-        /* child process was terminated by ctrl+c */
+        /* child process was terminated by ctrl+c(SIGINT) */
         else if(WIFSIGNALED(status))
         {
             Sigprocmask(SIG_BLOCK,&mask_all,&prev_all);
@@ -445,13 +462,14 @@ void sigchld_handler(int sig)
             deletejob(jobs,pid);
             Sigprocmask(SIG_SETMASK,&prev_all,NULL);
         }
+        /* child process was stopped by ctrl+z(SIGTSTOP) */
         else if(WIFSTOPPED(status))
         {
             struct job_t* job;
             Sigprocmask(SIG_BLOCK,&mask_all,&prev_all);
             job = (getjobpid(jobs,pid));
             job->state = ST;
-            printf("Job [%d](%d) stooped by signal",job->jid,pid);
+            printf("Job [%d](%d) stoped by signal",job->jid,pid);
             printf(" %d\n",/*WTERMSIG(status)*/20);
             Sigprocmask(SIG_SETMASK,&prev_all,NULL);
         }
@@ -468,6 +486,10 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+    // the father process receives the SIGINT
+    // and emmit the SIGINT to |-pid|
+    // which causes the child process(if exists) interrupted
+    // and then the 'waitpid()' in sigchld_handler() can catch this signal
     int olderrno = errno;
     pid_t pid = fgpid(jobs);    // Get the foreground job ID
     if(pid!= 0)
@@ -488,6 +510,10 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+    // the father process receives the SIGINT
+    // and emmit the SIGTSTOP to |-pid|
+    // which causes the child process(if exists) stopped
+    // and then the 'waitpid()' in sigchld_handler() can catch this signal
     int olderrno = errno;
     pid_t pid = fgpid(jobs);
     if(pid!= 0)
@@ -757,14 +783,6 @@ void Sigaddset(sigset_t *set, int signum)
     if (sigaddset(set, signum) < 0)
     unix_error("Sigaddset error");
     return;
-}
-
-int Sigsuspend(const sigset_t *set)
-{
-    int rc = sigsuspend(set); /* always returns -1 */
-    if (errno != EINTR)
-        unix_error("Sigsuspend error");
-    return rc;
 }
 
 int Kill(pid_t pid, int signum) 
