@@ -314,7 +314,7 @@ int builtin_cmd(char **argv)
     else if(!strcmp(argv[0],"jobs"))
     {
         Sigprocmask(SIG_BLOCK,&mask,&prev);
-        listjobs(jobs)；
+        listjobs(jobs);
         Sigprocmask(SIG_SETMASK,&prev,NULL);
         return 1;
     }
