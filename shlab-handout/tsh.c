@@ -6,6 +6,7 @@
  *          2019/2/16(进度：trace08-->signal处理程序完成)
  *          2019/2/16(进度：finish....ed?仍留有段错误(却通过了runtrace??))
  *          2019/2/17(完善注释)
+ *          2019/2/22(解决segment error，completed!)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -191,6 +192,13 @@ void eval(char *cmdline)
     Sigfillset(&mask_all);
     Sigemptyset(&mask_one);
     Sigaddset(&mask_one,SIGCHLD);
+
+    // This branch is essential to avoid "segment error"
+    // if you input nothing but an "Enter"
+    // without this branch, it will bring you the error.
+    // The same error will happen when use '&' to add a background job.  
+    if(argv[0] == NULL)
+        return;
 
     if(!builtin_cmd(argv))
     {
