@@ -5,6 +5,7 @@
     
     更新时间：2019/3/4(进度：搭建程序框架--基本照搬Tiny的设计，暂未考虑多线程，处理方式的不同将在doit()体现)
              2019/3/6(进度：doit接受terminal请求部分完成，向server发送请求部分完成)[均未验证]
+             2019/3/9(进度：静态HTTP事务完成，但是tiny无法找到home.html(?))
 */
 
 #include <stdio.h>
@@ -18,8 +19,10 @@ static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64;
 
 /* Functions */
 void doit(int connfd);
-void reqhd_rd(rio_t *rio,char* host);
-
+void reqhd_rd(rio_t *rio);
+void uri_parsing(char *uri, char* host,char* trac,char *port);
+void clienterror(int fd,char *cause,char *errnum,
+    char *shortmsg,char *longmsg);
 int main(int argc, char **argv)
 {
     int listenfd,connfd;
@@ -34,7 +37,6 @@ int main(int argc, char **argv)
     }
 
     listenfd = Open_listenfd(argv[1]);
-    printf("%s", user_agent_hdr);
 
     while(1)
     {
@@ -42,7 +44,7 @@ int main(int argc, char **argv)
         connfd = Accept(listenfd,(SA *)&clientaddr, &clientlen);
         Getnameinfo((SA *)&clientaddr,clientlen,hostname,MAXLINE,port,MAXLINE,0);
         doit(connfd);
-        Close(connfd);
+        
     }
     return 0;
 }
@@ -52,6 +54,7 @@ void doit(int connfd)
     /* Accept and read the HTTP requests from terminal(s) */
     char ubuf[MAXLINE]; // For requests reading
     char method[MAXLINE],host[MAXLINE],uri[MAXLINE],version[MAXLINE];
+    char port[MAXLINE],trac[MAXLINE];
     rio_t lrio;
 
     Rio_readinitb(&lrio,connfd);
@@ -60,56 +63,106 @@ void doit(int connfd)
     printf("%s",ubuf);
 
     sscanf(ubuf,"%s %s %s",method,uri,version);
-    if(strcasecmp(method,"GET"))
+    /*
+    if(strcmp(method,"GET"))
     {
-        clineterror(fd,method,"501","No implemented",
+        clienterror(connfd,method,"501","No implemented",
             "The TINY server doesn't implement this method");
         return;
     }
-    // The lab requires implementing a HTTP/1.0 GET
-    // but also asks 'Host' info from the Request headers
-    // to 'coax sensible responses out of certain Web servers'
-    // So we do need a ReadHead parsing
-    reqhd_rd(&lrio,host);
+    */
+    // URI parsing and
+    // we need reqhd_rd() to ignore the req header
+    uri_parsing(uri,host,trac,port);
+    reqhd_rd(&lrio);
 
     /* Send the HTTP requests to the Web Server */
     int clientfd;
-    char *port = "8080";
-    char reqline[MAXLINE];
-    char reqhead[MAXLINE];
+    int n;
+    //char reqline[MAXLINE];
+    char buf[MAXLINE];
+    char *buf_head = buf;
     rio_t rio;
 
     clientfd = Open_clientfd(host,port);
     Rio_readinitb(&rio,clientfd);
+    /*
     // Build the HTTP request line
-    strcmp(reqline,"GET ");
-    strcat(reqline,host);
-    strcat(reqline,uri);
+    strcpy(reqline,method);
     strcat(reqline," ");
-    strcat(reqline,version);
-    strcat(reqline,"\r\n");
+    //strcat(reqline,host);
+    strcat(reqline,trac);
+    strcat(reqline," ");
+    //strcat(reqline,version);
+    strcat(reqline,"HTTP/1.0");
+    //strcat(reqline,"\r\n");
     // request head is the User-Agent
     // request end is an "\r\n"
-
-    Rio_writen(clientfd,reqline,strlen(reqline));
-    Rio_writen(clientfd,user_agent_hdr,strlen(user_agent_hdr));
-    Rio_writen(clientfd,"\r\n",strlen("\r\n"));
-
+    */
     
+    sprintf(buf_head,"GET %s HTTP/1.0\r\n",trac);
+    buf_head = buf + strlen(buf);
+    sprintf(buf_head,"Host: %s\r\n\r\n",host);
+    Rio_writen(clientfd,buf,MAXLINE);
+
+    while((n=Rio_readlineb(&rio,buf,MAXLINE)))
+        Rio_writen(connfd,buf,n);
+
+    Close(connfd);
 
 }
 
-void reqhd_rd(rio_t *rio,char* host)
+void uri_parsing(char *uri, char *host, char *trac, char *port)
+{
+    char turi[MAXLINE];
+    strcpy(turi,uri);
+    char *p = strstr(turi,"http://");
+    p += strlen("http://");
+    char *q = strchr(p,'/');
+    *q = '\0';
+    strcpy(host,p);
+    *q = '/';
+    strcpy(trac,q);
+    if((p=strchr(host,':'))!=NULL)
+        strcpy(port,p+1);
+    // The host name might not include 
+    // the ':port'
+    *p = '\0';
+
+}
+
+void reqhd_rd(rio_t *rio)
 {
     char ubuf[MAXLINE];
-    Rio_readlineb(&rio,ubuf,MAXLINE);
+    Rio_readlineb(rio,ubuf,MAXLINE);
     // sscanf() will just replace the "\r\n" to '\0'
-    sscanf(ubuf,"%*s%s",host);
-    printf("Host: %s",host);
     while(strcmp(ubuf,"\r\n"))
     {
-        Rio_readlineb(&rio,ubuf,MAXLINE);
+        Rio_readlineb(rio,ubuf,MAXLINE);
         printf("%s",ubuf);
     }
     return;
 }
+/*
+void clienterror(int fd, char *cause, char *errnum, 
+         char *shortmsg, char *longmsg) 
+{
+    char buf[MAXLINE], body[MAXBUF];
+
+    // Build the HTTP response body 
+    sprintf(body, "<html><title>Tiny Error</title>");
+    sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
+    sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
+    sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
+    sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+
+    // Print the HTTP response 
+    sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-type: text/html\r\n");
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, body, strlen(body));
+}
+*/
